@@ -362,6 +362,70 @@ if stock1_name != stock2_name:
 else:
     st.warning("Please select two different stocks to compare!")
 
+# ── AI Stock Analyst Chatbot ──────────────────────────────
+st.divider()
+st.markdown("### AI Stock Analyst")
+st.markdown("*Ask anything about the selected stock*")
+
+groq_key = st.sidebar.text_input("Groq API Key (Free)", type="password")
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+if question := st.chat_input(f"Ask about {company}..."):
+    st.session_state.messages.append({"role": "user", "content": question})
+    with st.chat_message("user"):
+        st.markdown(question)
+
+    if groq_key:
+        context = f"""
+        You are a financial analyst assistant. The user is viewing {company} stock.
+        Current price: Rs.{current_price:.1f}
+        Today's change: {change_pct:.2f}%
+        Period high: Rs.{high_52w:.1f}
+        Period low: Rs.{low_52w:.1f}
+        RSI: {float(stock['RSI'].squeeze().iloc[-1]):.1f}
+        Answer concisely and clearly. Focus on facts and analysis.
+        """
+
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {groq_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": context},
+                    {"role": "user", "content": question}
+                ],
+                "max_tokens": 500
+            }
+        )
+
+        resp_json = response.json()
+        if "choices" in resp_json:
+            answer = resp_json["choices"][0]["message"]["content"]
+        elif "error" in resp_json:
+            answer = f"API Error: {resp_json['error']['message']}"
+        else:
+            answer = f"Unexpected response: {resp_json}"
+
+        with st.chat_message("assistant"):
+            st.markdown(answer)
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+
+        if st.button("Clear Chat"):
+            st.session_state.messages = []
+            st.rerun()
+    else:
+        with st.chat_message("assistant"):
+            st.markdown("Please enter your Groq API key in the sidebar. Get one free at console.groq.com!")
 # ── News Sentiment ────────────────────────────────────────
 st.divider()
 st.markdown("### News Sentiment Analysis")
