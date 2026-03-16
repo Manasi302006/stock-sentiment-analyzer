@@ -294,6 +294,74 @@ if st.session_state.portfolio:
         st.session_state.portfolio = []
         st.rerun()
 
+# ── Stock Comparison ──────────────────────────────────────
+st.divider()
+st.markdown("### Stock Comparison")
+st.markdown("*Compare two stocks side by side*")
+
+col_s1, col_s2 = st.columns(2)
+with col_s1:
+    stock1_name = st.selectbox("Stock 1", list(ticker_map.keys()), index=0, key="s1")
+with col_s2:
+    stock2_name = st.selectbox("Stock 2", list(ticker_map.keys()), index=1, key="s2")
+
+if stock1_name != stock2_name:
+    s1 = yf.download(ticker_map[stock1_name], period=period, auto_adjust=True)
+    s2 = yf.download(ticker_map[stock2_name], period=period, auto_adjust=True)
+
+    s1_norm = (s1["Close"].squeeze() / s1["Close"].squeeze().iloc[0]) * 100
+    s2_norm = (s2["Close"].squeeze() / s2["Close"].squeeze().iloc[0]) * 100
+
+    fig_cmp = go.Figure()
+
+    fig_cmp.add_trace(go.Scatter(
+        x=s1.index, y=s1_norm,
+        name=stock1_name,
+        line=dict(color="#00d4aa", width=2)
+    ))
+
+    fig_cmp.add_trace(go.Scatter(
+        x=s2.index, y=s2_norm,
+        name=stock2_name,
+        line=dict(color="#ff4b6e", width=2)
+    ))
+
+    fig_cmp.add_hline(y=100, line_dash="dash",
+                      line_color="#8892b0", line_width=0.8)
+
+    fig_cmp.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#0e1117",
+        plot_bgcolor="#1e2130",
+        height=400,
+        title=dict(
+            text=f"{stock1_name} vs {stock2_name} — Normalized Performance (Base 100)",
+            font=dict(color="#ccd6f6", size=13)
+        ),
+        legend=dict(bgcolor="#1e2130", font=dict(color="#ccd6f6")),
+        yaxis=dict(title="Indexed Price (Start = 100)",
+                   gridcolor="#2e3450",
+                   tickfont=dict(color="#8892b0")),
+        xaxis=dict(gridcolor="#2e3450",
+                   tickfont=dict(color="#8892b0"))
+    )
+
+    st.plotly_chart(fig_cmp, use_container_width=True)
+
+    # Performance summary
+    s1_return = ((s1["Close"].squeeze().iloc[-1] / s1["Close"].squeeze().iloc[0]) - 1) * 100
+    s2_return = ((s2["Close"].squeeze().iloc[-1] / s2["Close"].squeeze().iloc[0]) - 1) * 100
+    winner = stock1_name if s1_return > s2_return else stock2_name
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric(f"{stock1_name} Return", f"{s1_return:.2f}%",
+              f"{'▲' if s1_return >= 0 else '▼'}")
+    c2.metric(f"{stock2_name} Return", f"{s2_return:.2f}%",
+              f"{'▲' if s2_return >= 0 else '▼'}")
+    c3.metric("Winner", winner, f"by {abs(s1_return - s2_return):.2f}%")
+else:
+    st.warning("Please select two different stocks to compare!")
+
 # ── News Sentiment ────────────────────────────────────────
 st.divider()
 st.markdown("### News Sentiment Analysis")
